@@ -27,7 +27,9 @@ VIEWS.home = function () {
       ? 'Your finish-by date has passed. Update it in settings.'
       : `About ${wk} ${wk === 1 ? 'chapter' : 'chapters'} a week to finish by ${fmt(finishBy)}.`;
   }
-  const next = D.cet.filter(r => !r.done).slice(0, 4);
+  const pending = D.cet.filter(r => !r.done);
+  const hasPrio = pending.some(r => prioOf(r));
+  const next = byPriority(pending).slice(0, 4);
   const tentative = settings.cet_tentative !== 'false';
   const weekAgo = addDays(today, -6);
   const thisWeek = D.cet.filter(r => r.done && r.date && r.date >= weekAgo).length;
@@ -61,8 +63,8 @@ VIEWS.home = function () {
     <section class="grid g3 kpis">${kpis.map(k => `<div class="card kpi click" data-act="go" data-to="${k[3]}"><p class="kpi-label">${k[0]}</p><p class="kpi-value">${typeof k[1] === 'number' ? `<span data-count="${k[1]}">0</span>` : k[1]}${k[4] && typeof k[1] === 'number' ? k[4] : (k[1] !== '—' && k[4] ? k[4] : '')}</p><p class="kpi-sub">${k[2]}</p></div>`).join('')}</section>
 
     <section class="grid g2">
-      <div class="card tile"><h2>Up next</h2><p class="muted small">The next chapters on your list</p>
-        <div class="up-list">${next.length ? next.map(r => `<button class="row" data-act="toggleChapter" data-id="${r.id}" style="padding-left:0;padding-right:0"><span class="check">${ico('check', 14)}</span><span class="row-main"><span class="row-title">${esc(r.chapter)}</span><span class="row-sub">${esc(r.subject)}</span></span></button>`).join('') : '<p class="muted" style="margin-top:10px">Every chapter is done. Nice.</p>'}</div></div>
+      <div class="card tile"><h2>Up next</h2><p class="muted small">${hasPrio ? 'Highest priority first' : 'The next chapters on your list'}</p>
+        <div class="up-list">${next.length ? next.map(r => `<button class="row" data-act="toggleChapter" data-id="${r.id}" style="padding-left:0;padding-right:0"><span class="check">${ico('check', 14)}</span><span class="row-main"><span class="row-title">${esc(r.chapter)}</span><span class="row-sub">${esc(subjectOf(r))}</span></span>${prioOf(r) ? `<span class="pill prio-pill p-${prioOf(r).toLowerCase()}">${prioOf(r)}</span>` : ''}</button>`).join('') : '<p class="muted" style="margin-top:10px">Every chapter is done. Nice.</p>'}</div></div>
       <div class="card tile" style="display:flex;flex-direction:column"><h2>Vocabulary</h2><p class="muted small">${v.due.length ? 'Cards waiting for you today' : 'Nothing due right now'}</p>
         <p class="kpi-value" style="font-size:64px;margin:18px 0 18px"><span data-count="${v.due.length}">0</span></p>
         <div style="margin-top:auto"><button class="btn primary" data-act="startReview" ${v.due.length ? '' : 'disabled'}>Start review</button></div></div>
@@ -80,6 +82,7 @@ ACT.openSettings = () => {
     submitLabel: 'Save',
     deleteLabel: DEMO ? 'Reset demo' : 'Sign out',
     fields: [
+      { name: 'display_name', label: 'Your name' },
       { name: 'cet_date', label: 'MBA CET date', type: 'date' },
       { name: 'cet_tentative', label: 'Date is tentative', type: 'switch' },
       { name: 'cat_date', label: 'CAT date', type: 'date' },
@@ -87,13 +90,14 @@ ACT.openSettings = () => {
       { name: 'theme', label: 'Appearance', type: 'select', options: ['Auto', 'Light', 'Dark'] }
     ],
     values: {
-      cet_date: settings.cet_date, cet_tentative: settings.cet_tentative !== 'false', cat_date: settings.cat_date,
+      display_name: profile.name, cet_date: settings.cet_date, cet_tentative: settings.cet_tentative !== 'false', cat_date: settings.cat_date,
       finish_by: settings.finish_by, theme: ls.get('voyage.theme', 'Auto')
     },
     onSubmit(v) {
       ls.set('voyage.theme', v.theme); applyTheme(v.theme);
-      saveSettings({ cet_date: v.cet_date, cet_tentative: v.cet_tentative ? 'true' : 'false', cat_date: v.cat_date, finish_by: v.finish_by });
-      renderView(true);
+      if (v.display_name) profile.name = v.display_name;
+      saveSettings({ display_name: v.display_name || profile.name, cet_date: v.cet_date, cet_tentative: v.cet_tentative ? 'true' : 'false', cat_date: v.cat_date, finish_by: v.finish_by });
+      renderShell(); renderView(true);
       toast('Saved');
     },
     onDelete() {

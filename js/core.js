@@ -1,7 +1,7 @@
 /* Voyage — core: helpers, state, API, UI kit */
 
-const CONFIG = Object.assign({ API_URL: '' }, window.KVS_CONFIG || {});
-const DEMO = !CONFIG.API_URL;
+const CONFIG = Object.assign({ SUPABASE_URL: '', SUPABASE_ANON_KEY: '' }, window.KVS_CONFIG || {});
+const DEMO = !(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY);
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -52,20 +52,20 @@ const ICONS = {
   pin: '<path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
   shuffle: '<path d="M3 7h3.5c4 0 5 10 9 10H21M3 17h3.5c1.6 0 2.7-1.6 3.7-3.3M21 7h-5.5c-1.6 0-2.7 1.4-3.6 3"/><path d="M18.5 4.5L21 7l-2.5 2.5M18.5 14.5L21 17l-2.5 2.5"/>',
   heart: '<path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.4 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z"/>',
-  sparkle: '<path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9L12 17.5l-1.9-5.1L5 10.5l5.1-1.9z"/>'
+  sparkle: '<path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9L12 17.5l-1.9-5.1L5 10.5l5.1-1.9z"/>',
+  more: '<circle cx="5.5" cy="12" r="1.1"/><circle cx="12" cy="12" r="1.1"/><circle cx="18.5" cy="12" r="1.1"/>'
 };
 const ico = (n, s = 20) => `<svg class="ico" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ''}</svg>`;
 const BRAND_MARK = `<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="currentColor"/><circle cx="16" cy="16" r="7.5" fill="none" stroke="var(--bg)" stroke-opacity=".28" stroke-width="3"/><path d="M16 8.5a7.5 7.5 0 1 1-7.1 9.9" fill="none" stroke="var(--bg)" stroke-width="3" stroke-linecap="round"/></svg>`;
 
 /* ---------- state ---------- */
 const KEY = { cet: 'chapter', vocab: 'word', mocks: 'name', jobs: 'company', bucket: 'title' };
-const D = { cet: [], vocab: [], mocks: [], jobs: [], bucket: [] };
+const D = { cet: [], subjects: [], vocab: [], mocks: [], jobs: [], bucket: [] };
 let settings = {};
-let profile = { id: 'varun', name: 'Varun' };
-let auth = null;
+let profile = { id: 'demo', name: 'Varun' };
 const ui = {
   route: 'home',
-  study: { subject: 'All', q: '', hideDone: false },
+  study: { subject: 'All', q: '', hideDone: false, view: ls.get('voyage.studyView', 'subjects') },
   vocab: { tab: 'review', q: '', filter: 'All' },
   jobs: { q: '', status: 'All' },
   bucket: { cat: 'All', view: 'To do' }
@@ -81,17 +81,7 @@ const BUCKET_STATUS = ['Dream', 'Planned', 'In progress', 'Done'];
 
 /* ---------- API ---------- */
 async function api(action, payload = {}) {
-  if (DEMO) return demoApi(action, payload);
-  try {
-    const res = await fetch(CONFIG.API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // keeps the request "simple" so no CORS preflight
-      body: JSON.stringify(Object.assign({ action, pass: auth && auth.pass }, payload))
-    });
-    return await res.json();
-  } catch (e) {
-    return { ok: false, error: 'network', message: "Can't reach your sheet right now." };
-  }
+  return DEMO ? demoApi(action, payload) : sbApi(action, payload);
 }
 
 /* demo mode: same contract as the real backend, stored in the browser */
@@ -103,7 +93,7 @@ function demoDB() {
 async function demoApi(action, p) {
   await sleep(80);
   const db = demoDB();
-  if (action === 'load') return { ok: true, profile: { id: 'varun', name: 'Varun' }, settings: db.settings, data: db.data };
+  if (action === 'load') return { ok: true, profile: { id: 'demo', name: 'Varun' }, settings: db.settings, data: db.data };
   if (action === 'save') {
     const rows = db.data[p.section];
     let id = p.id;
@@ -118,6 +108,24 @@ async function demoApi(action, p) {
     return { ok: true, rows: db.data[p.section] };
   }
   if (action === 'settings') { Object.assign(db.settings, p.values); ls.set('voyage.demo', db); return { ok: true, settings: db.settings }; }
+  if (action === 'addSubject') {
+    const id = db.data.subjects.reduce((m, r) => Math.max(m, r.id), 0) + 1;
+    db.data.subjects.push({ id, name: p.name });
+    ls.set('voyage.demo', db);
+    return { ok: true, id };
+  }
+  if (action === 'renameSubject') {
+    const sub = db.data.subjects.find(x => x.id === p.id);
+    if (sub) { db.data.cet.forEach(r => { if (r.subject === sub.name) r.subject = p.to; }); sub.name = p.to; }
+    ls.set('voyage.demo', db);
+    return { ok: true };
+  }
+  if (action === 'removeSubject') {
+    const sub = db.data.subjects.find(x => x.id === p.id);
+    if (sub) { db.data.cet = db.data.cet.filter(r => r.subject !== sub.name); db.data.subjects = db.data.subjects.filter(x => x !== sub); }
+    ls.set('voyage.demo', db);
+    return { ok: true };
+  }
   return { ok: false, error: 'bad_action' };
 }
 function seedDemo() {
@@ -128,7 +136,7 @@ function seedDemo() {
     ...ch('LR', ['Seating Arrangement', 'Blood Relations', 'Syllogisms', 'Coding-Decoding', 'Data Sufficiency', 'Series']),
     ...ch('Verbal', ['Synonyms & Antonyms', 'One word Substitution', 'Spotting Errors', 'Fill in the Blanks', 'Parajumbles']),
     ...ch('AR', ['Visual Puzzles', 'Pattern Matching', 'Spatial Reasoning'])
-  ].map((r, i) => Object.assign({ id: i + 1 }, r));
+  ].map((r, i) => Object.assign({ id: i + 1, priority: '' }, r));
   [0, 1, 2, 8, 9, 14].forEach(i => { cet[i].done = true; cet[i].date = addDays(t, -(i % 5) - 1); });
   const w = (id, word, meaning, synonyms, ex1, ex2, status, box, next) => ({ id, word, meaning, synonyms, ex1, ex2, status, date: addDays(t, -30), box, next });
   const vocab = [
@@ -152,7 +160,9 @@ function seedDemo() {
     { id: 1, title: 'Trek to a Himalayan base camp', category: 'Health', when: 'Within 5 years', status: 'Dream', cost: '₹25,000', why: 'Proof I can do hard things.', friend: true, doneDate: '', memory: '' },
     { id: 2, title: 'Get into a top MBA college', category: 'Career', when: 'This year', status: 'In progress', cost: '', why: 'The reason I am doing all this.', friend: false, doneDate: '', memory: '' }
   ];
-  return { settings: { cet_date: addDays(t, 138), cet_tentative: 'true', cat_date: addDays(t, 11), finish_by: '' }, data: { cet, vocab, mocks, jobs, bucket } };
+  const subjects = ['Quant', 'LR', 'Verbal', 'AR'].map((name, i) => ({ id: i + 1, name }));
+  [0, 3, 11].forEach(i => { cet[i].priority = 'High'; }); cet[5].priority = 'Medium'; cet[9].priority = 'Low';
+  return { settings: { cet_date: addDays(t, 138), cet_tentative: 'true', cat_date: addDays(t, 11), finish_by: '', display_name: 'Varun' }, data: { cet, subjects, vocab, mocks, jobs, bucket } };
 }
 
 /* ---------- saving: optimistic, one request at a time ---------- */
@@ -160,6 +170,8 @@ let chain = Promise.resolve();
 let pending = 0;
 let syncErr = false;
 let tmpN = 0;
+const newKey = () => 'n' + Date.now().toString(36) + (++tmpN);   // on-screen id for rows that have not been saved yet
+const rowSid = r => (r._sid !== undefined ? r._sid : (typeof r.id === 'string' ? undefined : r.id)); // the database id, once there is one
 
 function setSync(state) {
   const d = $('#sync-dot'), t = $('#sync-text');
@@ -176,18 +188,17 @@ function enqueue(job) {
 function cacheData() { if (!DEMO) ls.set('voyage.cache', { profile, settings, data: D }); }
 function failed(res) {
   syncErr = true;
-  if (res && res.error === 'stale') { toast('The sheet changed elsewhere — refreshing.', 'error'); loadAll(); return; }
-  if (res && (res.error === 'auth' || res.error === 'inactive')) { signOut(res.message); return; }
+  if (res && res.error === 'auth') { signOut(res.message); return; }
   toast((res && res.message) || "Couldn't save that. Check your connection.", 'error');
 }
 
 function addRow(section, data) {
-  const row = Object.assign({ id: 'tmp' + (++tmpN) }, data);
+  const row = Object.assign({ id: newKey() }, data);   // row.id stays put so clicks on the screen keep working
   D[section].push(row);
   cacheData();
   enqueue(async () => {
     const res = await api('save', { section, row: data });
-    if (res && res.ok) { row.id = res.id; cacheData(); } else failed(res);
+    if (res && res.ok) { row._sid = res.id; cacheData(); } else failed(res);
   });
   return row;
 }
@@ -196,8 +207,9 @@ function updateRow(section, row, patch) {
   Object.assign(row, patch);
   cacheData();
   enqueue(async () => {
-    if (typeof row.id === 'string') return failed({ message: 'Still saving that item — try again in a moment.' });
-    const res = await api('save', { section, id: row.id, key, row: patch });
+    const sid = rowSid(row);
+    if (sid === undefined) return failed({ message: "That item didn't finish saving. Add it again." });
+    const res = await api('save', { section, id: sid, key, row: patch });
     if (!(res && res.ok)) failed(res);
   });
 }
@@ -205,14 +217,10 @@ function removeRow(section, row) {
   D[section] = D[section].filter(r => r !== row);
   cacheData();
   enqueue(async () => {
-    if (typeof row.id === 'string') return;
-    const res = await api('remove', { section, id: row.id, key: row[KEY[section]] });
-    if (res && res.ok) {
-      const saved = D[section].filter(r => typeof r.id !== 'string');
-      if (saved.length === res.rows.length) saved.forEach((r, i) => { r.id = res.rows[i].id; });
-      else D[section] = res.rows;
-      cacheData();
-    } else failed(res);
+    const sid = rowSid(row);
+    if (sid === undefined) return;                // never reached the database, nothing to delete
+    const res = await api('remove', { section, id: sid, key: row[KEY[section]] });
+    if (res && res.ok) cacheData(); else failed(res);
   });
 }
 function saveSettings(values) {
@@ -222,11 +230,58 @@ function saveSettings(values) {
 }
 
 /* ---------- derived numbers ---------- */
+/* subjects are rows of their own (D.subjects), so a subject can exist before it has any chapters */
+const PRIORITIES = ['High', 'Medium', 'Low'];
+const prioOf = r => (PRIORITIES.includes(r.priority) ? r.priority : '');
+const prioRank = r => { const i = PRIORITIES.indexOf(prioOf(r)); return i < 0 ? PRIORITIES.length : i; };
+const byPriority = list => list.map((r, i) => [r, i]).sort((a, b) => prioRank(a[0]) - prioRank(b[0]) || a[1] - b[1]).map(x => x[0]);
+const subjectOf = r => r.subject || 'Other';
+const allSubjects = () => D.subjects.map(s => s.name);
+const cleanName = v => String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+const canonSubject = v => {
+  const t = cleanName(v);
+  return allSubjects().find(x => x.toLowerCase() === t.toLowerCase()) || t;
+};
+function addSubject(name) {                       // optimistic: shows at once, saved in the background
+  const sub = { id: newKey(), name };
+  D.subjects.push(sub);
+  cacheData();
+  enqueue(async () => {
+    const res = await api('addSubject', { name });
+    if (res && res.ok) { sub.id = res.id; cacheData(); } else failed(res);
+  });
+  return sub;
+}
+function renameSubject(from, to) {
+  const sub = D.subjects.find(x => x.name === from); if (!sub) return;
+  sub.name = to;
+  D.cet.forEach(r => { if (r.subject === from) r.subject = to; });
+  if (ui.study.subject === from) ui.study.subject = to;
+  cacheData();
+  enqueue(async () => {
+    if (typeof sub.id === 'string') return;       // never saved, nothing to rename
+    const res = await api('renameSubject', { id: sub.id, to });
+    if (!(res && res.ok)) failed(res);
+  });
+}
+function removeSubject(name) {                    // its chapters go with it
+  const sub = D.subjects.find(x => x.name === name); if (!sub) return;
+  D.subjects = D.subjects.filter(x => x !== sub);
+  D.cet = D.cet.filter(r => subjectOf(r) !== name);
+  if (ui.study.subject === name) ui.study.subject = 'All';
+  cacheData();
+  enqueue(async () => {
+    if (typeof sub.id === 'string') return;
+    const res = await api('removeSubject', { id: sub.id });
+    if (!(res && res.ok)) failed(res);
+  });
+}
 function cetStats() {
   const rows = D.cet, total = rows.length, done = rows.filter(r => r.done).length;
   const map = new Map();
+  D.subjects.forEach(s => map.set(s.name, { name: s.name, total: 0, done: 0 }));
   rows.forEach(r => {
-    const k = r.subject || 'Other';
+    const k = subjectOf(r);
     if (!map.has(k)) map.set(k, { name: k, total: 0, done: 0 });
     const o = map.get(k); o.total++; if (r.done) o.done++;
   });
@@ -329,6 +384,7 @@ function fieldHTML(f, v) {
   if (f.type === 'textarea') return `<label class="${cls}"><span>${esc(f.label)}</span><textarea name="${f.name}" rows="${f.rows || 3}" placeholder="${ph}">${esc(val)}</textarea></label>`;
   if (f.type === 'select') return `<label class="${cls}"><span>${esc(f.label)}</span><select name="${f.name}">${f.options.map(o => `<option ${o === val ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></label>`;
   if (f.type === 'switch') return `<label class="switch-row"><span>${esc(f.label)}</span><input type="checkbox" name="${f.name}" ${val ? 'checked' : ''}><i class="switch"></i></label>`;
+  if (f.type === 'combo') return `<label class="${cls}"><span>${esc(f.label)}</span><input type="text" name="${f.name}" value="${esc(val)}" placeholder="${ph}" list="dl-${f.name}" autocomplete="off" maxlength="40"><datalist id="dl-${f.name}">${(f.options || []).map(o => `<option value="${esc(o)}"></option>`).join('')}</datalist></label>`;
   const extra = f.type === 'number' ? 'inputmode="decimal" step="any"' : f.type === 'url' ? 'inputmode="url" autocapitalize="off" autocorrect="off"' : '';
   return `<label class="${cls}"><span>${esc(f.label)}${f.required ? '' : ''}</span><input type="${f.type || 'text'}" name="${f.name}" value="${esc(val)}" placeholder="${ph}" ${extra} ${f.type === 'text' || !f.type ? 'autocomplete="off"' : ''}></label>`;
 }

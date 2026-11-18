@@ -50,7 +50,7 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('keydown', e => {
   // let keyboard users open rows that are not real buttons
-  if ((e.key === 'Enter') && e.target.matches && e.target.matches('div.row[data-act]')) { e.preventDefault(); ACT[e.target.dataset.act](e.target, e); }
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('div.row[data-act]')) { e.preventDefault(); ACT[e.target.dataset.act](e.target, e); }
 });
 
 /* ---------- data loading ---------- */
@@ -63,41 +63,56 @@ async function loadAll() {
   const res = await api('load');
   if (res && res.ok) {
     applyData(res); cacheData();
-    if (res.errors && Object.keys(res.errors).length) toast('Some tabs could not be read. Run setup in Apps Script to see why.', 'error');
-    if ($('#view')) { if (!fc.el) renderView(true); }
-    return true;
+    if (res.errors && Object.keys(res.errors).length) toast('Some lists could not be loaded. Pull to refresh in a moment.', 'error');
+    if ($('#view') && !fc.el) renderView(true);
+    return { ok: true };
   }
-  if (res && (res.error === 'auth' || res.error === 'inactive')) { signOut(res.message); return false; }
-  toast((res && res.message) || "Can't reach your sheet right now.", 'error');
+  if (res && res.error === 'auth') { signOut(res.message); return { ok: false, handled: true }; }
+  const message = (res && res.message) || "Can't reach your database right now.";
   setSync('error');
-  return false;
+  return { ok: false, message };
 }
 
-/* ---------- login ---------- */
+/* ---------- sign in / out ---------- */
 function showLogin(message = '') {
-  $('#app').innerHTML = `<div class="login"><form class="login-card" id="login-form">${BRAND_MARK}<h1>Voyage</h1><p>Enter your passcode to open your space.</p>
-    <input type="password" id="pass" placeholder="Passcode" autocomplete="current-password" autocapitalize="off" aria-label="Passcode" required>
-    <div class="login-err" id="login-err" role="alert">${esc(message)}</div><button class="btn primary" type="submit">Continue</button></form></div>`;
-  const input = $('#pass'); input.focus();
+  $('#app').innerHTML = `<div class="login"><form class="login-card" id="login-form">${BRAND_MARK}<h1>Voyage</h1><p>Sign in to open your space.</p>
+    <input type="email" id="email" name="email" placeholder="Email" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Email" required>
+    <input type="password" id="pass" name="password" placeholder="Password" autocomplete="current-password" aria-label="Password" required>
+    <div class="login-err" id="login-err" role="alert">${esc(message)}</div><button class="btn primary" type="submit">Sign in</button></form></div>`;
+  const email = $('#email'), pass = $('#pass');
+  email.value = ls.get('voyage.email', '') || '';
+  (email.value ? pass : email).focus();
   $('#login-form').addEventListener('submit', async e => {
     e.preventDefault();
-    const btn = $('button', e.target); btn.disabled = true; btn.textContent = 'Opening…';
-    auth = { pass: input.value.trim() };
-    const res = await api('load');
-    if (res && res.ok) {
-      ls.set('voyage.auth', auth);
-      applyData(res); cacheData(); start();
-    } else {
-      auth = null; btn.disabled = false; btn.textContent = 'Continue';
-      $('#login-err').textContent = (res && res.message) || 'Something went wrong. Try again.';
-      input.select();
+    const btn = $('button', e.target); btn.disabled = true; btn.textContent = 'Signing in…';
+    const res = await sbSignIn(email.value.trim(), pass.value);
+    if (res.ok) {
+      ls.set('voyage.email', email.value.trim());
+      btn.textContent = 'Opening…';
+      const out = await loadAll();
+      if (out.ok) return start();
+      if (out.handled) return;
+      sbSignOut(); btn.disabled = false; btn.textContent = 'Sign in';
+      $('#login-err').textContent = out.message;
+      return;
     }
+    btn.disabled = false; btn.textContent = 'Sign in';
+    $('#login-err').textContent = res.message || 'Something went wrong. Try again.';
+    pass.select();
   });
 }
 function signOut(message) {
-  ls.del('voyage.auth'); ls.del('voyage.cache'); auth = null;
+  sbSignOut();
+  ls.del('voyage.cache');
   Object.keys(D).forEach(k => { D[k] = []; });
-  showLogin(message || '');
+  settings = {};
+  if (fc && fc.el) { fc.el.remove(); fc.el = null; document.body.style.overflow = ''; }
+  showLogin(typeof message === 'string' ? message : '');
+}
+function showRetry(message) {
+  $('#app').innerHTML = `<div class="login"><div class="login-card"><h1 style="font-size:26px">Can't open your space</h1><p>${esc(message)}</p><button class="btn primary" id="retry">Try again</button><p style="margin:18px 0 0"><button class="link" id="out">Sign out</button></p></div></div>`;
+  $('#retry').addEventListener('click', () => boot());
+  $('#out').addEventListener('click', () => signOut());
 }
 
 /* ---------- boot ---------- */
@@ -106,21 +121,25 @@ function start() {
   if (!location.hash) location.hash = '#/home';
   route();
 }
+let booted = false;
 async function boot() {
   applyTheme(ls.get('voyage.theme', 'Auto'));
-  window.addEventListener('hashchange', route);
+  if (!booted) { window.addEventListener('hashchange', route); booted = true; }
   if (DEMO) {
-    auth = { pass: 'demo' };
     const res = await api('load'); applyData(res);
     return start();
   }
-  auth = ls.get('voyage.auth');
-  if (!auth) return showLogin();
+  ls.del('voyage.auth');                          // left over from the Google Sheets version
+  SB.session = ls.get('voyage.session');
+  if (!SB.session || !SB.session.user) return showLogin();
   const cached = ls.get('voyage.cache');
-  if (cached) { applyData(cached); start(); loadAll(); }   // show last-known data instantly, refresh behind it
-  else {
-    $('#app').innerHTML = '<div class="login"><div class="login-card"><p style="margin:0">Opening your space…</p></div></div>';
-    if (await loadAll()) start();
+  if (cached && cached.profile && cached.profile.id === SB.session.user.id && cached.data && cached.data.subjects) {
+    applyData(cached); start(); loadAll();        // show what we had last time instantly, refresh behind it
+    return;
   }
+  $('#app').innerHTML = '<div class="login"><div class="login-card"><p style="margin:0">Opening your space…</p></div></div>';
+  const out = await loadAll();
+  if (out.ok) return start();
+  if (!out.handled) showRetry(out.message);
 }
 boot();
