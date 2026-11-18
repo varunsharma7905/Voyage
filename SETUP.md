@@ -1,51 +1,40 @@
-# Voyage — setup (about 15 minutes)
+# Voyage setup: Supabase + GitHub + Cloudflare Pages
 
-Voyage has two parts: a **backend** (a small Google Apps Script that lives inside your sheet) and the **web app** (the files in this folder). Your Google Sheet stays the single source of truth.
+About 15 minutes, one time.
 
-Until step 5 is done, the app runs in **demo mode** with sample data, so you can open `index.html` and look around first.
+## 1. Create the database
+1. Go to supabase.com and sign in with GitHub. Click **New project**.
+2. Name it `voyage`, set a database password (save it somewhere), and choose the **Mumbai (ap-south-1)** region. Wait for it to finish.
 
-## 1. Add the backend to your sheet
-1. Open your sheet (KVS_Voyage) → **Extensions → Apps Script**.
-2. Delete everything in `Code.gs` and paste in the contents of `backend/Code.gs`. Save.
+## 2. Create the tables
+1. Open **SQL Editor → New query**.
+2. Paste the whole of `supabase/schema.sql` and click **Run**. It should say "Success".
 
-## 2. Set your passcode
-1. In Apps Script, click the **gear icon (Project Settings)**.
-2. Under **Script properties → Add script property**: name `PASS_VARUN`, value = a passcode you will remember (6+ characters, not your Google password).
+## 3. Turn off public sign-ups and create your login
+1. **Authentication → Sign In / Providers → Email**: turn **off** "Allow new users to sign up". (Only people you add can log in.)
+2. **Authentication → Users → Add user → Create new user**: enter your email and a password, and tick **Auto Confirm User**.
 
-The passcode is never written in the code or in the web app files.
+## 4. Import your current progress (one time)
+1. Open `supabase/seed.sql`, change `you@example.com` on the line marked `CHANGE THIS` to the email from step 3.
+2. Paste the whole file into a new SQL Editor query and **Run**.
+   It loads your 4 subjects, 63 chapters (with the ones already done), 10 vocab words and your dates.
+   It is a snapshot of your Google Sheet from 18 Nov. Do not run it twice (it refuses if you already have data).
 
-## 3. Run the one-time setup
-1. In the editor, choose the function **setup** in the dropdown and press **Run**. Approve the permissions (Google may say "unverified app" — this is your own script: *Advanced → Go to project*).
-2. Open **Execution log**. You should see lines like `Varun · CET_Varun → 63 rows found`. If a line says PROBLEM, tell me what it says.
+## 5. Connect the app
+1. **Project Settings → API**: copy the **Project URL** and the **anon public** key.
+2. Paste them into `config.js`:
+   ```js
+   window.KVS_CONFIG = { SUPABASE_URL: "https://xxxx.supabase.co", SUPABASE_ANON_KEY: "eyJ..." };
+   ```
+   Both are safe in a public repo. Every table is locked to its owner by row-level security.
 
-This creates the new tabs it needs (`Mocks_Varun`, `Settings_Varun`) and adds a few helper columns (Box, Next review; Status, Added). Your existing columns and chapters are untouched.
+## 6. Publish
+Replace the files in your GitHub repo with these, commit and push. Cloudflare Pages redeploys on its own in about a minute. Open the site and sign in with the email and password from step 3.
 
-## 4. Publish the backend
-1. **Deploy → New deployment → type: Web app**.
-2. *Execute as:* **Me**. *Who has access:* **Anyone**. (Anyone with the link can reach it, but every request needs your passcode.)
-3. Deploy, then **copy the Web app URL**.
-
-## 5. Connect the web app
-Open `config.js` and paste the URL between the quotes:
-
-```js
-window.KVS_CONFIG = { API_URL: "https://script.google.com/macros/s/XXXX/exec" };
-```
-
-## 6. Host it (free)
-**Cloudflare Pages:** Workers & Pages → Create → Pages → **Upload assets** → drag in the whole folder (`backend/` and `SETUP.md` are not needed, but harmless) → Deploy.
-Or push the folder to a GitHub repo and connect it to Cloudflare Pages (no build command, output directory `/`).
-
-## 7. Put it on your devices
-- **iPhone / iPad:** open the site in Safari → Share → **Add to Home Screen**.
-- **Laptop:** just bookmark it (Chrome: ⋮ → Cast, save and share → Install page as app).
-
-## Switching Kiran on later
-1. Duplicate your `CET_Varun` tab, rename it `CET_Kiran` (his progress starts fresh once you untick the boxes). His vocab tab `Kiran-Vocab` already exists.
-2. Script properties: add `PASS_KIRAN` = his passcode and `ACTIVE_KIRAN` = `true`.
-3. Run `setup` again. He opens the same site and signs in with his passcode and sees only his own data.
+## Adding Kiran later
+Authentication → Users → Add user (auto-confirm). He signs in with his own email and gets a separate, empty space. Nobody else can see your data.
 
 ## Good to know
-- **Exam dates** are edited inside the app (Home → tap a countdown, or the sliders icon). CET is marked tentative until you switch that off.
-- **After changing Code.gs**, publish a new version: Deploy → Manage deployments → pencil → Version: New version → Deploy.
-- **Your "Apprenticeship student" tab** contains other people's names and codes. The app never reads it, but I would not keep it in a sheet others can open by link.
+- Supabase free projects pause after about a week of no use. Opening the Supabase dashboard and clicking **Restore** wakes it, and nothing is lost.
+- The Google Sheet is no longer used by the app. Its Statistics block will not update any more.
+- Leave `config.js` values empty to run the app in demo mode with sample data.
