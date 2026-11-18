@@ -8,7 +8,7 @@ const SB = {
   byName: new Map(),      // lower-case subject name -> id
   byId: new Map()         // id -> subject name
 };
-const sbUrl = () => String(CONFIG.SUPABASE_URL).replace(/\/+$/, '');
+const sbUrl = () => { const u = String(CONFIG.SUPABASE_URL).trim(); try { return new URL(u).origin; } catch (e) { return u.replace(/\/+$/, ''); } };
 
 class SbError extends Error {
   constructor(kind, message, status) { super(message); this.kind = kind; this.status = status || 0; }
