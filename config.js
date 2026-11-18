@@ -2,6 +2,6 @@
 // the key only works together with a signed-in login, and every table is locked to its owner.
 // While these are empty, Voyage runs in demo mode with sample data stored only in this browser.
 window.KVS_CONFIG = {
-  SUPABASE_URL: "",
+  SUPABASE_URL: "https://hkjhntofwxpkorfrkqmy.supabase.co/rest/v1/",
   SUPABASE_ANON_KEY: ""
 };
