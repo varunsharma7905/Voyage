@@ -5,7 +5,7 @@
 
 do $seed$
 declare
-  v_email text := 'you@example.com';  -- <<< CHANGE THIS
+  v_email text := 'varun.sharma7905@gmail.com';  -- <<< CHANGE THIS
   v_user  uuid;
 begin
   select id into v_user from auth.users where lower(email) = lower(v_email);
