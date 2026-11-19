@@ -59,22 +59,26 @@ const ico = (n, s = 20) => `<svg class="ico" width="${s}" height="${s}" viewBox=
 const BRAND_MARK = `<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="currentColor"/><circle cx="16" cy="16" r="7.5" fill="none" stroke="var(--bg)" stroke-opacity=".28" stroke-width="3"/><path d="M16 8.5a7.5 7.5 0 1 1-7.1 9.9" fill="none" stroke="var(--bg)" stroke-width="3" stroke-linecap="round"/></svg>`;
 
 /* ---------- state ---------- */
-const KEY = { cet: 'chapter', vocab: 'word', mocks: 'name', jobs: 'company', bucket: 'title' };
-const D = { cet: [], subjects: [], vocab: [], mocks: [], jobs: [], bucket: [] };
+const KEY = { cet: 'chapter', vocab: 'word', mocks: 'name', jobs: 'company', contacts: 'name', bucket: 'title' };
+const D = { cet: [], subjects: [], vocab: [], mocks: [], jobs: [], contacts: [], bucket: [] };
 let settings = {};
 let profile = { id: 'demo', name: 'Varun' };
 const ui = {
   route: 'home',
   study: { subject: 'All', q: '', hideDone: false, view: ls.get('voyage.studyView', 'subjects') },
   vocab: { tab: 'review', q: '', filter: 'All' },
-  jobs: { q: '', status: 'All' },
+  jobs: { tab: 'jobs', q: '', status: 'All', pq: '', stage: 'All' },
   bucket: { cat: 'All', view: 'To do' }
 };
 const ACT = {}; // click handlers, keyed by data-act
 const INP = {}; // input handlers, keyed by data-inp
 const VIEWS = {};
 
-const JOB_STATUS = ['Saved', 'Applied', 'Interview', 'Offer', 'Closed'];
+const JOB_STATUS = ['Saved', 'Tailored', 'Applied', 'Referral asked', 'Interview', 'Offer', 'Closed'];
+const JOB_CATEGORY = ['CA / advisory', 'Wealth / broking', 'Corporate finance (tech)', 'Finance ops / KPO', 'Fintech', 'Bank / NBFC', 'Other'];
+const JOB_SOURCE = ['Career page', 'LinkedIn', 'Naukri', 'Indeed', 'Referral', 'Cold email', 'Walk-in', 'Other'];
+const RESUME_VERSIONS = ['Master', 'Advisory / wealth', 'Corporate finance'];
+const CONTACT_STAGE = ['To contact', 'Sent', 'Follow-up 1', 'Follow-up 2', 'Replied', 'Closed'];
 const BUCKET_CATS = ['Travel', 'Experiences', 'Skills', 'Career', 'Health', 'Food', 'Giving back', 'Things'];
 const BUCKET_WHEN = ['This year', 'Next year', 'Within 5 years', 'Someday'];
 const BUCKET_STATUS = ['Dream', 'Planned', 'In progress', 'Done'];
@@ -93,6 +97,7 @@ function demoDB() {
 async function demoApi(action, p) {
   await sleep(80);
   const db = demoDB();
+  if (!db.data.contacts) db.data.contacts = [];     // demo data saved before the job-hunt upgrade
   if (action === 'load') return { ok: true, profile: { id: 'demo', name: 'Varun' }, settings: db.settings, data: db.data };
   if (action === 'save') {
     const rows = db.data[p.section];
@@ -154,7 +159,13 @@ function seedDemo() {
     { id: 3, date: addDays(t, -7), name: 'Mock 3', score: 112, outOf: 200, quant: 30, lr: 40, verbal: 24, ar: 18, minutes: 115, notes: 'Verbal improving.' }
   ];
   const jobs = [
-    { id: 1, company: 'Sample Tech Pvt Ltd', title: 'Business Analyst Intern', field: 'Analytics', location: 'Baner, Pune', link: 'https://example.com', description: 'Entry role supporting the strategy team.', status: 'Saved', added: addDays(t, -3) }
+    { id: 1, company: 'Sample Tech Pvt Ltd', title: 'Finance Operations Analyst', field: 'Finance', location: 'Baner, Pune', link: 'https://example.com', description: 'Entry role in the finance operations team.', status: 'Saved', added: addDays(t, -3),
+      category: 'Corporate finance (tech)', fit: 82, commute: '15 min', source: 'Career page', applyEmail: '', deadline: addDays(t, 9), resume: 'Corporate finance', coverNote: '', appliedOn: '', followUp: '' },
+    { id: 2, company: 'Sample Advisory LLP', title: 'Junior Associate', field: 'Advisory', location: 'Sus Road, Pune', link: '', description: 'Sample firm that takes applications by email.', status: 'Applied', added: addDays(t, -8),
+      category: 'CA / advisory', fit: 74, commute: '10 min', source: 'Cold email', applyEmail: 'careers@example.com', deadline: '', resume: 'Advisory / wealth', coverNote: '', appliedOn: addDays(t, -6), followUp: addDays(t, -1) }
+  ];
+  const contacts = [
+    { id: 1, companyId: 2, name: 'Sample HR', role: 'HR Manager', email: 'hr@example.com', emailStatus: 'Guessed', linkedin: '', stage: 'Sent', sentCount: 1, sentOn: addDays(t, -6), nextFollowUp: addDays(t, -1), connectedOn: '', notes: 'Sample contact. Delete me.' }
   ];
   const bucket = [
     { id: 1, title: 'Trek to a Himalayan base camp', category: 'Health', when: 'Within 5 years', status: 'Dream', cost: '₹25,000', why: 'Proof I can do hard things.', friend: true, doneDate: '', memory: '' },
@@ -162,7 +173,7 @@ function seedDemo() {
   ];
   const subjects = ['Quant', 'LR', 'Verbal', 'AR'].map((name, i) => ({ id: i + 1, name }));
   [0, 3, 11].forEach(i => { cet[i].priority = 'High'; }); cet[5].priority = 'Medium'; cet[9].priority = 'Low';
-  return { settings: { cet_date: addDays(t, 138), cet_tentative: 'true', cat_date: addDays(t, 11), finish_by: '', display_name: 'Varun' }, data: { cet, subjects, vocab, mocks, jobs, bucket } };
+  return { settings: { cet_date: addDays(t, 138), cet_tentative: 'true', cat_date: addDays(t, 11), finish_by: '', display_name: 'Varun' }, data: { cet, subjects, vocab, mocks, jobs, contacts, bucket } };
 }
 
 /* ---------- saving: optimistic, one request at a time ---------- */
@@ -192,12 +203,24 @@ function failed(res) {
   toast((res && res.message) || "Couldn't save that. Check your connection.", 'error');
 }
 
+/* A person points at a company by its id. If that company has not finished saving, its on-screen id is a
+   temporary key, so swap in the real database id at the moment the request is sent. */
+function resolveRefs(row) {
+  if (!row || !('companyId' in row)) return row;
+  const v = row.companyId;
+  if (typeof v === 'string' && v !== '' && !isFinite(Number(v))) {
+    const j = D.jobs.find(x => x.id === v), sid = j ? rowSid(j) : undefined;
+    return Object.assign({}, row, { companyId: sid === undefined ? '' : sid });
+  }
+  return row;
+}
+
 function addRow(section, data) {
   const row = Object.assign({ id: newKey() }, data);   // row.id stays put so clicks on the screen keep working
   D[section].push(row);
   cacheData();
   enqueue(async () => {
-    const res = await api('save', { section, row: data });
+    const res = await api('save', { section, row: resolveRefs(data) });
     if (res && res.ok) { row._sid = res.id; cacheData(); } else failed(res);
   });
   return row;
@@ -209,7 +232,7 @@ function updateRow(section, row, patch) {
   enqueue(async () => {
     const sid = rowSid(row);
     if (sid === undefined) return failed({ message: "That item didn't finish saving. Add it again." });
-    const res = await api('save', { section, id: sid, key, row: patch });
+    const res = await api('save', { section, id: sid, key, row: resolveRefs(patch) });
     if (!(res && res.ok)) failed(res);
   });
 }

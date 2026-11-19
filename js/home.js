@@ -38,7 +38,7 @@ VIEWS.home = function () {
     ['Mocks taken', m.taken, m.last ? `Latest ${m.last.score}/${m.last.outOf}` : 'Log your first one', 'mocks'],
     ['Best mock', m.best ? Math.round(m.pct(m.best)) : '—', m.best ? `${m.best.score}/${m.best.outOf} · ${esc(m.best.name)}` : 'Nothing yet', 'mocks', '%'],
     ['Words learned', v.mastered + v.learning, `${v.total} saved · ${v.mastered} mastered`, 'vocab'],
-    ['Companies saved', D.jobs.length, D.jobs.filter(j => j.status === 'Applied' || j.status === 'Interview').length + ' in progress', 'jobs'],
+    ['Companies saved', D.jobs.length, D.jobs.filter(j => ['Applied', 'Referral asked', 'Interview'].includes(j.status)).length + ' in progress', 'jobs'],
     ['Bucket list', b.done, `of ${b.total} done`, 'bucket']
   ];
 
@@ -69,6 +69,8 @@ VIEWS.home = function () {
         <p class="kpi-value" style="font-size:64px;margin:18px 0 18px"><span data-count="${v.due.length}">0</span></p>
         <div style="margin-top:auto"><button class="btn primary" data-act="startReview" ${v.due.length ? '' : 'disabled'}>Start review</button></div></div>
     </section>
+
+    ${huntHomeCard()}
   </div>`;
 };
 

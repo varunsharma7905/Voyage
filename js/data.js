@@ -118,11 +118,16 @@ async function sbAll(path) {                      // reads every row, 1000 at a 
 }
 
 /* ---------- field maps: [app name, column, kind] ---------- */
-// kinds: date = may be empty (null), date0 / num0 = column can't be null (left out when empty), num = may be empty, bool
+// kinds: date = may be empty (null), date0 / num0 = column can't be null (left out when empty), num = may be empty, bool,
+//        ref = id of another row (null when empty)
 const SB_MAP = {
   vocab: { table: 'vocab', f: [['word', 'word'], ['meaning', 'meaning'], ['synonyms', 'synonyms'], ['ex1', 'example1'], ['ex2', 'example2'], ['status', 'status'], ['date', 'added_on', 'date0'], ['box', 'box', 'num0'], ['next', 'next_review', 'date']] },
   mocks: { table: 'mocks', f: [['name', 'name'], ['date', 'taken_on', 'date0'], ['score', 'score', 'num0'], ['outOf', 'out_of', 'num0'], ['quant', 'quant', 'num'], ['lr', 'lr', 'num'], ['verbal', 'verbal', 'num'], ['ar', 'ar', 'num'], ['minutes', 'minutes', 'num'], ['notes', 'notes']] },
-  jobs: { table: 'companies', f: [['company', 'company'], ['title', 'title'], ['field', 'field'], ['location', 'location'], ['link', 'link'], ['description', 'description'], ['status', 'status'], ['added', 'added_on', 'date0']] },
+  jobs: { table: 'companies', f: [['company', 'company'], ['title', 'title'], ['field', 'field'], ['location', 'location'], ['link', 'link'], ['description', 'description'], ['status', 'status'], ['added', 'added_on', 'date0'],
+    ['category', 'category'], ['fit', 'fit', 'num'], ['commute', 'commute'], ['source', 'source'], ['applyEmail', 'apply_email'], ['deadline', 'deadline', 'date'],
+    ['resume', 'resume_version'], ['coverNote', 'cover_note'], ['appliedOn', 'applied_on', 'date'], ['followUp', 'follow_up_on', 'date']] },
+  contacts: { table: 'contacts', f: [['companyId', 'company_id', 'ref'], ['name', 'name'], ['role', 'role'], ['email', 'email'], ['emailStatus', 'email_status'], ['linkedin', 'linkedin'], ['stage', 'stage'],
+    ['sentCount', 'sent_count', 'num0'], ['sentOn', 'last_sent_on', 'date'], ['nextFollowUp', 'next_follow_up_on', 'date'], ['connectedOn', 'connect_sent_on', 'date'], ['notes', 'notes']] },
   bucket: { table: 'bucket_items', f: [['title', 'title'], ['category', 'category'], ['when', 'horizon'], ['status', 'status'], ['cost', 'cost'], ['why', 'why'], ['friend', 'with_friend', 'bool'], ['doneDate', 'done_on', 'date'], ['memory', 'memory']] }
 };
 function sbToDb(map, row) {
@@ -135,6 +140,7 @@ function sbToDb(map, row) {
     else if (kind === 'num0') { if (v === '' || v == null) continue; v = Number(v); }
     else if (kind === 'num') v = (v === '' || v == null) ? null : Number(v);
     else if (kind === 'bool') v = !!v;
+    else if (kind === 'ref') v = (v === '' || v == null || !isFinite(Number(v))) ? null : Number(v);
     else v = v == null ? '' : String(v);
     out[col] = v;
   }
@@ -147,6 +153,7 @@ function sbFromDb(map, r) {
     if (kind === 'date' || kind === 'date0') v = v ? String(v).slice(0, 10) : '';
     else if (kind === 'num' || kind === 'num0') v = (v === null || v === undefined) ? '' : Number(v);
     else if (kind === 'bool') v = !!v;
+    else if (kind === 'ref') v = (v === null || v === undefined) ? '' : Number(v);
     else v = v == null ? '' : String(v);
     o[k] = v;
   }
@@ -187,6 +194,7 @@ async function sbLoad() {
     vocab: 'vocab?select=*&order=id.asc',
     mocks: 'mocks?select=*&order=id.asc',
     jobs: 'companies?select=*&order=id.asc',
+    contacts: 'contacts?select=*&order=id.asc',
     bucket: 'bucket_items?select=*&order=id.asc',
     settings: 'settings?select=key,value'
   };
