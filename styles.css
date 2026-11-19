@@ -424,3 +424,33 @@ button.prio-pill:not(.p-high):not(.p-medium):not(.p-low) { background: transpare
 .subj-row { display: flex; align-items: center; gap: 16px; padding: 13px 0; }
 .subj-row + .subj-row { border-top: 1px solid var(--line); }
 .link.danger-link { color: var(--danger); }
+
+/* ---------- job hunt ---------- */
+.btn.sm { padding: 6px 14px; font-size: 14px; }
+.job-actions { display: inline-flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+.tag.warn { color: var(--danger); background: color-mix(in srgb, var(--danger) 11%, transparent); }
+.due-card { display: flex; flex-direction: column; gap: 2px; padding: 16px 22px; margin-bottom: 18px; border-left: 3px solid var(--danger); }
+.cap-note { margin: -8px 4px 16px; }
+.cap-note.over { color: var(--danger); }
+.hunt-card { margin-top: 18px; }
+.hunt-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.goal-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px 28px; margin-top: 18px; }
+.goal p { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px; }
+.goal p span:last-child { color: var(--muted); font-variant-numeric: tabular-nums; }
+.fu-list { margin-top: 18px; display: grid; gap: 2px; border-top: 1px solid var(--line); padding-top: 8px; }
+.fu-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: left; padding: 10px 4px; border-radius: 10px; transition: background .2s; }
+.fu-row:hover { background: var(--surface-2); }
+.fu-row span b { display: block; font-weight: 600; font-size: 15.5px; }
+.fu-row span small { display: block; color: var(--muted); font-size: 13.5px; }
+.fu-row em { font-style: normal; color: var(--danger); font-size: 13.5px; flex: none; }
+.kit { display: grid; gap: 16px; }
+.kit-step { display: flex; gap: 14px; align-items: flex-start; }
+.kit-step b { font-size: 16px; font-weight: 600; }
+.kit-step p { margin: 2px 0 0; }
+.kit-n { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-size: 13.5px; font-weight: 650; display: grid; place-items: center; }
+.kit-area { width: 100%; margin-top: 10px; padding: 14px 16px; border-radius: 14px; background: var(--surface-2); font: inherit; font-size: 15px; line-height: 1.5; resize: vertical; min-height: 120px; }
+.kit-area:focus { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+.kit-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.kit .field { grid-column: auto; }
+.kit .field input, .kit .field textarea { width: 100%; }
+@media (max-width: 760px) { .hide-sm { display: none; } .head-actions .btn { white-space: nowrap; } }
